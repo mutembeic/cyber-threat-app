@@ -1,7 +1,4 @@
-# backend/main.py
-
 import json
-import os
 import re
 import string
 from pathlib import Path
@@ -25,7 +22,6 @@ app = FastAPI(
 
 # --- Constants and Paths ---
 BASE_DIR = Path(__file__).resolve(strict=True).parent.parent 
-APP_DIR = Path(__file__).resolve(strict=True).parent # Path to the 'backend' directory
 MODEL_DIR = BASE_DIR / "model"
 MODEL_PATH = MODEL_DIR / "improved_base_model.h5"
 TOKENIZER_PATH = MODEL_DIR / "tokenizer.json"
@@ -45,20 +41,10 @@ stop_words = None
 @app.on_event("startup")
 def load_resources():
     """
-    Load the trained model, tokenizer, and NLTK data at application startup.
+    Load the trained model, tokenizer, and NLTK resources at application startup.
+    NLTK data is expected to be pre-downloaded in the container via the NLTK_DATA environment variable.
     """
     global model, tokenizer, lemmatizer, stop_words
-
-    # --- NLTK Data Handling ---
-    nltk_data_dir = APP_DIR / "nltk_data"
-    os.makedirs(nltk_data_dir, exist_ok=True)
-    nltk.data.path.append(str(nltk_data_dir))
-    
-    print("Downloading NLTK resources to local app directory...")
-    nltk.download('wordnet', download_dir=str(nltk_data_dir), quiet=True)
-    nltk.download('stopwords', download_dir=str(nltk_data_dir), quiet=True)
-    nltk.download('punkt', download_dir=str(nltk_data_dir), quiet=True)
-    nltk.download('punkt_tab', download_dir=str(nltk_data_dir), quiet=True)
 
     print("Loading model and tokenizer...")
     try:
@@ -70,6 +56,9 @@ def load_resources():
         print(f"Error loading model or tokenizer: {e}")
         raise RuntimeError(f"Could not load ML model resources: {e}")
 
+    print("Initializing NLTK resources...")
+    # All NLTK download and path logic is removed.
+    # The Dockerfile's ENV variable tells NLTK where to find the data.
     lemmatizer = WordNetLemmatizer()
     stop_words = set(stopwords.words('english'))
 
@@ -121,4 +110,7 @@ def predict(payload: TextInput):
             "confidence": float(prediction_prob)
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred during prediction: {str(e)}")
+        # Include the specific error for better debugging
+        error_detail = f"An error occurred during prediction: {str(e)}"
+        print(error_detail) # Also print to server logs
+        raise HTTPException(status_code=500, detail=error_detail)
